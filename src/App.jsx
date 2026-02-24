@@ -1,5 +1,190 @@
+// import { useState, useEffect, useRef } from "react";
+// import { Toaster, toast } from "sonner";
+
+// import AppHeader from "./components/AppHeader";
+// import ExcelNormalizer from "./ExcelNormalizer";
+// import ExcelSender from "./ExcelSender";
+
+// export default function App() {
+//   const [active, setActive] = useState("normalizacion");
+//   const [warehouses, setWarehouses] = useState([]);
+//   const alreadyRan = useRef(false);
+
+//   useEffect(() => {
+//     if (alreadyRan.current) return;
+//     alreadyRan.current = true;
+
+//     const procesarToken = async () => {
+//       try {
+//         const params = new URLSearchParams(window.location.search);
+//         const token = params.get("token");
+//         const node = params.get("node");
+
+//         if (!token || !node) {
+//           console.warn("⚠️ Falta token o node en la URL");
+//           return;
+//         }
+
+//         console.log("🔑 TOKEN:", token);
+//         console.log("🌐 NODE:", node);
+
+//         const salesNode = `https://n${node}.sales.casamarketapp.com`;
+//         const productNode = `https://n${node}.product.casamarketapp.com`;
+
+//         // ================================
+//         // 🔐 FETCH CON MANEJO 401
+//         // ================================
+//         const fetchWithAuth = async (url, extraHeaders = {}) => {
+//           const res = await fetch(url, {
+//             headers: {
+//               Authorization: `Bearer ${token}`,
+//               ...extraHeaders,
+//             },
+//           });
+
+//           if (res.status === 401) {
+//             console.warn("🔒 Token inválido o expirado");
+//             toast.error("Sesión expirada. Recargando...");
+//             setTimeout(() => window.location.reload(), 1500);
+//             throw new Error("Unauthorized");
+//           }
+
+//           return res;
+//         };
+
+//         // =============================
+//         // 1️⃣ TRAER EMPLOYEE
+//         // =============================
+//         console.log("📡 Obteniendo employee...");
+
+//         const employeeRes = await fetchWithAuth(
+//           `${salesNode}/employees/current`,
+//           {
+//             Accept: "application/vnd.appv1.10.1+json",
+//           }
+//         );
+
+//         if (!employeeRes.ok) {
+//           throw new Error("Error obteniendo employee");
+//         }
+
+//         const employeeData = await employeeRes.json();
+
+//         console.log("═══════════════════════════");
+//         console.log("👤 EMPLOYEE DATA");
+//         console.log(employeeData);
+
+//         // =============================
+//         // 2️⃣ TRAER WAREHOUSES
+//         // =============================
+//         console.log("═══════════════════════════");
+//         console.log("🏭 OBTENIENDO WAREHOUSES...");
+
+//         const warehouseRes = await fetchWithAuth(
+//           `${productNode}/warehouses`,
+//           {
+//             Accept: "application/json",
+//           }
+//         );
+
+//         if (!warehouseRes.ok) {
+//           throw new Error("Error obteniendo warehouses");
+//         }
+
+//         const allWarehouses = await warehouseRes.json();
+
+//         const warehousesFiltrados = allWarehouses.filter(
+//           (w) => w.companyId === employeeData.companyId && w.flagActive
+//         );
+
+//         console.log("🏭 WAREHOUSES FILTRADOS:");
+//         console.table(
+//           warehousesFiltrados.map((w) => ({
+//             id: w.id,
+//             name: w.name,
+//             companyId: w.companyId,
+//             activo: w.flagActive,
+//           }))
+//         );
+
+//         setWarehouses(warehousesFiltrados);
+
+//         // =============================
+//         // 3️⃣ TRAER PRICE LISTS
+//         // =============================
+//         console.log("═══════════════════════════");
+//         console.log("💰 OBTENIENDO LISTAS DE PRECIOS...");
+
+//         const priceListsRes = await fetchWithAuth(
+//           `${salesNode}/sal-price-lists?page=1&limit=10&sortDirection=desc&sortField=created_at`,
+//           {
+//             Accept: "application/vnd.appv1.10.1+json",
+//           }
+//         );
+
+//         if (!priceListsRes.ok) {
+//           throw new Error("Error obteniendo listas de precios");
+//         }
+
+//         const priceLists = await priceListsRes.json();
+
+//         console.log("💰 LISTAS DE PRECIOS:");
+//         console.table(
+//           priceLists.map((pl) => ({
+//             id: pl.id,
+//             name: pl.name,
+//             description: pl.description,
+//             flagDefault: pl.flagDefault === 1 ? "✅" : "❌",
+//             flagActive: pl.flagActive === 1 ? "✅" : "❌",
+//           }))
+//         );
+
+//         console.log("═══════════════════════════");
+//         console.log("✅ PROCESO COMPLETADO");
+//         console.log("Sales Node:", salesNode);
+//         console.log("Product Node:", productNode);
+
+//       } catch (error) {
+//         console.error("❌ ERROR:", error);
+//       }
+//     };
+
+//     procesarToken();
+//   }, []);
+
+//   const handleNavigateToCarga = () => {
+//     setActive("carga");
+//   };
+
+//   return (
+//     <div className="min-h-screen bg-slate-50">
+//       <Toaster position="top-right" richColors closeButton />
+
+//       <AppHeader active={active} onChange={setActive} />
+
+//       <main className="mx-auto max-w-6xl px-4 py-8">
+//         {active === "normalizacion" ? (
+//           <ExcelNormalizer
+//             warehouses={warehouses}
+//             onNavigateToCarga={handleNavigateToCarga}
+//           />
+//         ) : (
+//           <ExcelSender />
+//         )}
+//       </main>
+//     </div>
+//   );
+// }
+
+
+
+
+
+
+
+// App.jsx (fragmento modificado)
 import { useState, useEffect, useRef } from "react";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 
 import AppHeader from "./components/AppHeader";
 import ExcelNormalizer from "./ExcelNormalizer";
@@ -7,8 +192,8 @@ import ExcelSender from "./ExcelSender";
 
 export default function App() {
   const [active, setActive] = useState("normalizacion");
-
-  // 🔥 Esto evita que React StrictMode ejecute dos veces el efecto
+  const [warehouses, setWarehouses] = useState([]);
+  const [employeeData, setEmployeeData] = useState(null); // 👈 NUEVO: guardar datos del empleado
   const alreadyRan = useRef(false);
 
   useEffect(() => {
@@ -19,131 +204,132 @@ export default function App() {
       try {
         const params = new URLSearchParams(window.location.search);
         const token = params.get("token");
+        const node = params.get("node");
 
-        if (!token) {
-          console.warn("⚠️ No se recibió token");
+        if (!token || !node) {
+          console.warn("⚠️ Falta token o node en la URL");
           return;
         }
 
         console.log("🔑 TOKEN:", token);
+        console.log("🌐 NODE:", node);
 
-        // Decodificar JWT (solo debug)
-        const tokenParts = token.split(".");
-        if (tokenParts.length === 3) {
-          const payload = JSON.parse(atob(tokenParts[1]));
-          console.log("📦 PAYLOAD:", payload);
-        }
+        const salesNode = `https://n${node}.sales.casamarketapp.com`;
+        const productNode = `https://n${node}.product.casamarketapp.com`;
 
-        let salesNode = null;
-        let productNode = null;
-        let employeeData = null;
+        // ================================
+        // 🔐 FETCH CON MANEJO 401
+        // ================================
+        const fetchWithAuth = async (url, extraHeaders = {}) => {
+          const res = await fetch(url, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              ...extraHeaders,
+            },
+          });
 
-        // =============================
-        // 1️⃣ DETECTAR NODO SALES
-        // =============================
-        for (let i = 1; i <= 5; i++) {
-          const url = `https://n${i}.sales.casamarketapp.com`;
-
-          try {
-            console.log(`📡 Probando SALES n${i}`);
-
-            const res = await fetch(`${url}/employees/current`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: "application/vnd.appv1.10.1+json",
-              },
-            });
-
-            if (res.ok) {
-              employeeData = await res.json();
-              salesNode = url;
-              console.log(`✅ SALES encontrado en n${i}`);
-              break;
-            }
-          } catch (e) {
-            console.log(`❌ SALES n${i} no respondió`);
+          if (res.status === 401) {
+            console.warn("🔒 Token inválido o expirado");
+            toast.error("Sesión expirada. Recargando...");
+            setTimeout(() => window.location.reload(), 1500);
+            throw new Error("Unauthorized");
           }
+
+          return res;
+        };
+
+        // =============================
+        // 1️⃣ TRAER EMPLOYEE
+        // =============================
+        console.log("📡 Obteniendo employee...");
+
+        const employeeRes = await fetchWithAuth(
+          `${salesNode}/employees/current`,
+          {
+            Accept: "application/vnd.appv1.10.1+json",
+          }
+        );
+
+        if (!employeeRes.ok) {
+          throw new Error("Error obteniendo employee");
         }
 
-        if (!salesNode) {
-          throw new Error("No se encontró nodo SALES válido");
-        }
+        const employeeData = await employeeRes.json();
 
         console.log("═══════════════════════════");
         console.log("👤 EMPLOYEE DATA");
         console.log(employeeData);
+        
+        // 👈 GUARDAR DATOS DEL EMPLEADO
+        setEmployeeData(employeeData);
 
         // =============================
-        // 2️⃣ DETECTAR NODO PRODUCT REAL
-        // =============================
-        for (let i = 1; i <= 5; i++) {
-          const url = `https://n${i}.product.casamarketapp.com`;
-
-          try {
-            console.log(`📡 Probando PRODUCT n${i}`);
-
-            const res = await fetch(`${url}/warehouses`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: "application/json",
-              },
-            });
-
-            if (!res.ok) continue;
-
-            const data = await res.json();
-
-            // 🔥 SOLO aceptar si realmente trae warehouses
-            if (Array.isArray(data) && data.length > 0) {
-              productNode = url;
-              console.log(`✅ PRODUCT REAL encontrado en n${i}`);
-              break;
-            } else {
-              console.log(`⚠️ n${i} respondió pero sin warehouses`);
-            }
-
-          } catch (e) {
-            console.log(`❌ PRODUCT n${i} no respondió`);
-          }
-        }
-
-        if (!productNode) {
-          throw new Error("No se encontró nodo PRODUCT con warehouses");
-        }
-
-        // =============================
-        // 3️⃣ TRAER WAREHOUSES DEFINITIVOS
+        // 2️⃣ TRAER WAREHOUSES
         // =============================
         console.log("═══════════════════════════");
-        console.log("🏭 OBTENIENDO WAREHOUSES COMPLETOS...");
+        console.log("🏭 OBTENIENDO WAREHOUSES...");
 
-        const warehouseRes = await fetch(
+        const warehouseRes = await fetchWithAuth(
           `${productNode}/warehouses`,
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
+            Accept: "application/json",
           }
         );
+
+        if (!warehouseRes.ok) {
+          throw new Error("Error obteniendo warehouses");
+        }
 
         const allWarehouses = await warehouseRes.json();
 
-        // Filtrar por companyId del empleado
         const warehousesFiltrados = allWarehouses.filter(
-          (w) => w.companyId === employeeData.companyId
+          (w) => w.companyId === employeeData.companyId && w.flagActive
         );
 
-        console.log("🏭 WAREHOUSES FILTRADOS POR COMPANY:");
+        console.log("🏭 WAREHOUSES FILTRADOS:");
         console.table(
           warehousesFiltrados.map((w) => ({
             id: w.id,
             name: w.name,
-            code: w.code,
             companyId: w.companyId,
             activo: w.flagActive,
           }))
         );
+
+        setWarehouses(warehousesFiltrados);
+
+        // =============================
+        // 3️⃣ TRAER PRICE LISTS
+        // =============================
+        console.log("═══════════════════════════");
+        console.log("💰 OBTENIENDO LISTAS DE PRECIOS...");
+
+        const priceListsRes = await fetchWithAuth(
+          `${salesNode}/sal-price-lists?page=1&limit=10&sortDirection=desc&sortField=created_at`,
+          {
+            Accept: "application/vnd.appv1.10.1+json",
+          }
+        );
+
+        if (!priceListsRes.ok) {
+          throw new Error("Error obteniendo listas de precios");
+        }
+
+        const priceLists = await priceListsRes.json();
+
+        console.log("💰 LISTAS DE PRECIOS:");
+        console.table(
+          priceLists.map((pl) => ({
+            id: pl.id,
+            name: pl.name,
+            description: pl.description,
+            flagDefault: pl.flagDefault === 1 ? "✅" : "❌",
+            flagActive: pl.flagActive === 1 ? "✅" : "❌",
+          }))
+        );
+
+        // 👈 GUARDAR LISTAS DE PRECIOS EN SESSIONSTORAGE PARA ExcelSender
+        sessionStorage.setItem('priceLists', JSON.stringify(priceLists));
 
         console.log("═══════════════════════════");
         console.log("✅ PROCESO COMPLETADO");
@@ -170,9 +356,12 @@ export default function App() {
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         {active === "normalizacion" ? (
-          <ExcelNormalizer onNavigateToCarga={handleNavigateToCarga} />
+          <ExcelNormalizer
+            warehouses={warehouses}
+            onNavigateToCarga={handleNavigateToCarga}
+          />
         ) : (
-          <ExcelSender />
+          <ExcelSender employeeData={employeeData} /> // 👈 PASAR DATOS DEL EMPLEADO
         )}
       </main>
     </div>
