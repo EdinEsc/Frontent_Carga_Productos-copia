@@ -1,152 +1,178 @@
-// // src/App.jsx
-// import { useState } from "react";
-// import { Toaster } from "sonner";
-
-// import AppHeader from "./components/AppHeader";
-// import ExcelNormalizer from "./ExcelNormalizer";
-// import ExcelSender from "./ExcelSender";
-
-// export default function App() {
-//   const [active, setActive] = useState("normalizacion");
-
-//   // Función para navegar a la sección de carga
-//   const handleNavigateToCarga = () => {
-//     setActive("carga");
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-slate-50">
-//       <Toaster position="top-right" richColors closeButton />
-
-//       <AppHeader active={active} onChange={setActive} />
-
-//       <main className="mx-auto max-w-6xl px-4 py-8">
-//         {active === "normalizacion" ? (
-//           <ExcelNormalizer onNavigateToCarga={handleNavigateToCarga} />
-//         ) : (
-//           <ExcelSender />
-//         )}
-//       </main>
-//     </div>
-//   );
-// }
-
-
-
-
-
-
-// src/App.jsx
-import { useEffect, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Toaster } from "sonner";
 
 import AppHeader from "./components/AppHeader";
 import ExcelNormalizer from "./ExcelNormalizer";
 import ExcelSender from "./ExcelSender";
 
-function getQueryParam(name) {
-  const fromSearch = new URLSearchParams(window.location.search).get(name);
-  if (fromSearch) return fromSearch;
-
-  const hash = window.location.hash || "";
-  const qIndex = hash.indexOf("?");
-  if (qIndex === -1) return null;
-
-  const hashQuery = hash.slice(qIndex + 1);
-  return new URLSearchParams(hashQuery).get(name);
-}
-
-async function fetchJson(url, token) {
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`GET ${url} -> ${res.status}: ${txt}`);
-  }
-
-  return res.json();
-}
-
 export default function App() {
   const [active, setActive] = useState("normalizacion");
-  const [user, setUser] = useState(null);
-  const [commerce, setCommerce] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  // 🔥 Esto evita que React StrictMode ejecute dos veces el efecto
+  const alreadyRan = useRef(false);
 
   useEffect(() => {
-    let alive = true;
+    if (alreadyRan.current) return;
+    alreadyRan.current = true;
 
-    (async () => {
+    const procesarToken = async () => {
       try {
-        const userParam = getQueryParam("user");
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("token");
 
-        if (!userParam) {
-          setLoading(false);
+        if (!token) {
+          console.warn("⚠️ No se recibió token");
           return;
         }
 
-        // Parsear user desde query
-        const parsedUser = JSON.parse(decodeURIComponent(userParam));
-        const token = parsedUser?.token;
+        console.log("🔑 TOKEN:", token);
 
-        if (!token) {
-          throw new Error("No se encontró token en ?user=");
+        // Decodificar JWT (solo debug)
+        const tokenParts = token.split(".");
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(atob(tokenParts[1]));
+          console.log("📦 PAYLOAD:", payload);
         }
 
-        // 🔥 Consumir SOLO commerce desde tu backend
-        const commerceData = await fetchJson(
-          "http://localhost:8000/dev/commerce",
-          token
+        let salesNode = null;
+        let productNode = null;
+        let employeeData = null;
+
+        // =============================
+        // 1️⃣ DETECTAR NODO SALES
+        // =============================
+        for (let i = 1; i <= 5; i++) {
+          const url = `https://n${i}.sales.casamarketapp.com`;
+
+          try {
+            console.log(`📡 Probando SALES n${i}`);
+
+            const res = await fetch(`${url}/employees/current`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.appv1.10.1+json",
+              },
+            });
+
+            if (res.ok) {
+              employeeData = await res.json();
+              salesNode = url;
+              console.log(`✅ SALES encontrado en n${i}`);
+              break;
+            }
+          } catch (e) {
+            console.log(`❌ SALES n${i} no respondió`);
+          }
+        }
+
+        if (!salesNode) {
+          throw new Error("No se encontró nodo SALES válido");
+        }
+
+        console.log("═══════════════════════════");
+        console.log("👤 EMPLOYEE DATA");
+        console.log(employeeData);
+
+        // =============================
+        // 2️⃣ DETECTAR NODO PRODUCT REAL
+        // =============================
+        for (let i = 1; i <= 5; i++) {
+          const url = `https://n${i}.product.casamarketapp.com`;
+
+          try {
+            console.log(`📡 Probando PRODUCT n${i}`);
+
+            const res = await fetch(`${url}/warehouses`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+              },
+            });
+
+            if (!res.ok) continue;
+
+            const data = await res.json();
+
+            // 🔥 SOLO aceptar si realmente trae warehouses
+            if (Array.isArray(data) && data.length > 0) {
+              productNode = url;
+              console.log(`✅ PRODUCT REAL encontrado en n${i}`);
+              break;
+            } else {
+              console.log(`⚠️ n${i} respondió pero sin warehouses`);
+            }
+
+          } catch (e) {
+            console.log(`❌ PRODUCT n${i} no respondió`);
+          }
+        }
+
+        if (!productNode) {
+          throw new Error("No se encontró nodo PRODUCT con warehouses");
+        }
+
+        // =============================
+        // 3️⃣ TRAER WAREHOUSES DEFINITIVOS
+        // =============================
+        console.log("═══════════════════════════");
+        console.log("🏭 OBTENIENDO WAREHOUSES COMPLETOS...");
+
+        const warehouseRes = await fetch(
+          `${productNode}/warehouses`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
         );
 
-        if (alive) {
-          setUser(parsedUser);
-          setCommerce(commerceData);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error("Error:", err);
-        if (alive) setLoading(false);
-      }
-    })();
+        const allWarehouses = await warehouseRes.json();
 
-    return () => {
-      alive = false;
+        // Filtrar por companyId del empleado
+        const warehousesFiltrados = allWarehouses.filter(
+          (w) => w.companyId === employeeData.companyId
+        );
+
+        console.log("🏭 WAREHOUSES FILTRADOS POR COMPANY:");
+        console.table(
+          warehousesFiltrados.map((w) => ({
+            id: w.id,
+            name: w.name,
+            code: w.code,
+            companyId: w.companyId,
+            activo: w.flagActive,
+          }))
+        );
+
+        console.log("═══════════════════════════");
+        console.log("✅ PROCESO COMPLETADO");
+        console.log("Sales Node:", salesNode);
+        console.log("Product Node:", productNode);
+
+      } catch (error) {
+        console.error("❌ ERROR:", error);
+      }
     };
+
+    procesarToken();
   }, []);
 
-  if (loading) return <div className="p-8">Cargando...</div>;
+  const handleNavigateToCarga = () => {
+    setActive("carga");
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
       <Toaster position="top-right" richColors closeButton />
 
-      <AppHeader active={active} onChange={setActive} user={user} />
-
-      {import.meta.env.DEV && (
-        <pre className="p-4 text-xs overflow-auto">
-          {JSON.stringify(
-            {
-              user,
-              commercePreview: commerce,
-            },
-            null,
-            2
-          )}
-        </pre>
-      )}
+      <AppHeader active={active} onChange={setActive} />
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         {active === "normalizacion" ? (
-          <ExcelNormalizer user={user} commerce={commerce} />
+          <ExcelNormalizer onNavigateToCarga={handleNavigateToCarga} />
         ) : (
-          <ExcelSender user={user} commerce={commerce} />
+          <ExcelSender />
         )}
       </main>
     </div>
