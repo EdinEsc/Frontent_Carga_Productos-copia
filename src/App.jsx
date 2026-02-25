@@ -9,7 +9,7 @@ import ExcelSender from "./ExcelSender";
 export default function App() {
   const [active, setActive] = useState("normalizacion");
   const [warehouses, setWarehouses] = useState([]);
-  const [employeeData, setEmployeeData] = useState(null); // 👈 NUEVO: guardar datos del empleado
+  const [employeeData, setEmployeeData] = useState(null); 
   const alreadyRan = useRef(false);
 
   useEffect(() => {
