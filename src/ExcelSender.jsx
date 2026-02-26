@@ -1,8 +1,9 @@
+// src/ExcelSender.jsx
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
 
-export default function ExcelSender({ employeeData }) {
+export default function ExcelSender({ employeeData, warehouses = [] }) {
   const NODES = useMemo(
     () => [
       { key: "n1", label: "Nodo 1", base: "https://n1.japiexcel.casamarketapp.com" },
@@ -13,16 +14,21 @@ export default function ExcelSender({ employeeData }) {
     []
   );
 
-  // ===== DETECTAR MODO DE CARGA =====
+  // ===== DETECTAR SI VIENE DEL FLUJO DE LIMPIEZA =====
+  const [cameFromNormalizer, setCameFromNormalizer] = useState(false);
+  
+  // ===== SELECTOR DE MODO (solo útil si NO viene del normalizer) =====
   const [cargaMode, setCargaMode] = useState("NORMAL");
   
+  // Detectar modo del archivo pendiente
   useEffect(() => {
     const pendingName = sessionStorage.getItem('pendingExcelName');
-    if (pendingName && pendingName.includes('CONVERSION')) {
-      setCargaMode("CONVERSION");
-      console.log("📦 Modo CONVERSIÓN detectado");
-    } else {
-      console.log("📦 Modo NORMAL detectado");
+    if (pendingName) {
+      if (pendingName.includes('CONVERSION')) {
+        setCargaMode("CONVERSION");
+      }
+      // Si hay archivo pendiente, significa que vino del normalizer
+      setCameFromNormalizer(true);
     }
   }, []);
 
@@ -82,21 +88,34 @@ export default function ExcelSender({ employeeData }) {
   const [subsidiaryId, setSubsidiaryId] = useState("");
   const [priceListId, setPriceListId] = useState(""); // Para modo NORMAL
 
+  // ===== Estado para almacén seleccionado (solo útil si NO viene del normalizer) =====
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
+  const [selectedWarehouseName, setSelectedWarehouseName] = useState("");
+
   // ===== Estado para listas de precios =====
   const [priceLists, setPriceLists] = useState([]);
   const [loadingPriceLists, setLoadingPriceLists] = useState(false);
   const [priceListsError, setPriceListsError] = useState("");
 
-  // ===== idWarehouse desde normalizer =====
+  // ===== idWarehouse (viene del normalizer o se selecciona manualmente) =====
   const [idWarehouse, setIdWarehouse] = useState("");
   const [idCountry, setIdCountry] = useState("1");
   
-  const [applyIgvCost, setApplyIgvCost] = useState(true);
-  const [applyIgvSale, setApplyIgvSale] = useState(true);
+  // ===== IGV - SOLO un switch simple =====
+  const [aplicarIgv, setAplicarIgv] = useState(true); // true = aplicar IGV (01), false = no aplicar (02)
   
+  // taxCodeCountry se calcula según la selección
   const taxCodeCountry = useMemo(() => {
-    return (!applyIgvCost && !applyIgvSale) ? "02" : "01";
-  }, [applyIgvCost, applyIgvSale]);
+    // Si vino del normalizer, tomamos lo que tenga sessionStorage
+    if (cameFromNormalizer) {
+      const savedApplyIgvCost = sessionStorage.getItem('applyIgvCost');
+      const savedApplyIgvSale = sessionStorage.getItem('applyIgvSale');
+      const aplica = savedApplyIgvCost === 'true' || savedApplyIgvSale === 'true';
+      return aplica ? "01" : "02";
+    }
+    // Si no vino del normalizer, usamos la selección del switch
+    return aplicarIgv ? "01" : "02";
+  }, [cameFromNormalizer, aplicarIgv]);
 
   const [flagUseSimpleBrand, setFlagUseSimpleBrand] = useState(true);
 
@@ -110,8 +129,6 @@ export default function ExcelSender({ employeeData }) {
   // ===== CARGAR DATOS DEL EMPLEADO =====
   useEffect(() => {
     if (employeeData) {
-      console.log("📦 Datos de empleado recibidos:", employeeData);
-      
       if (employeeData.companyId) {
         setCompanyId(String(employeeData.companyId));
       }
@@ -124,27 +141,26 @@ export default function ExcelSender({ employeeData }) {
       
       if (employeeData.warWarehousesId) {
         setIdWarehouse(String(employeeData.warWarehousesId));
+        setSelectedWarehouseId(String(employeeData.warWarehousesId));
       }
     }
   }, [employeeData]);
 
-  // ===== CARGAR ESTADO DESDE NORMALIZER =====
+  // ===== CARGAR ESTADO DESDE NORMALIZER (si vino de ahí) =====
   useEffect(() => {
-    const savedApplyIgvCost = sessionStorage.getItem('applyIgvCost');
-    const savedApplyIgvSale = sessionStorage.getItem('applyIgvSale');
-    
-    if (savedApplyIgvCost !== null) {
-      setApplyIgvCost(savedApplyIgvCost === 'true');
-    }
-    if (savedApplyIgvSale !== null) {
-      setApplyIgvSale(savedApplyIgvSale === 'true');
-    }
-    
+    // SOLO cargar el warehouse de sessionStorage si vino del normalizer
     const selectedWarehouseId = sessionStorage.getItem('selectedWarehouseId');
-    if (selectedWarehouseId) {
+    if (selectedWarehouseId && cameFromNormalizer) {
       setIdWarehouse(selectedWarehouseId);
+      setSelectedWarehouseId(selectedWarehouseId);
+      
+      // Buscar el nombre del almacén
+      const warehouse = warehouses.find(w => String(w.id) === String(selectedWarehouseId));
+      if (warehouse) {
+        setSelectedWarehouseName(warehouse.name);
+      }
     }
-  }, []);
+  }, [cameFromNormalizer, warehouses]);
 
   // ===== CARGAR LISTAS DE PRECIOS =====
   useEffect(() => {
@@ -156,19 +172,16 @@ export default function ExcelSender({ employeeData }) {
         
         if (savedPriceLists) {
           const data = JSON.parse(savedPriceLists);
-          console.log("💰 LISTAS DE PRECIOS CARGADAS:", data);
           setPriceLists(data);
 
           // Para modo NORMAL: seleccionar una por defecto
           if (cargaMode === "NORMAL") {
             if (data.length === 1) {
               setPriceListId(String(data[0].id));
-              toast.info(`Lista seleccionada: ${data[0].name}`);
             } else if (data.length > 1) {
               const defaultList = data.find(pl => pl.flagDefault === 1 || pl.flagDefault === true);
               if (defaultList) {
                 setPriceListId(String(defaultList.id));
-                // toast.info(`Lista por defecto seleccionada: ${defaultList.name}`);
               }
             }
           }
@@ -176,7 +189,6 @@ export default function ExcelSender({ employeeData }) {
           // Para modo CONVERSIÓN: seleccionar todas por defecto
           if (cargaMode === "CONVERSION") {
             setSelectedPriceLists(new Set(data.map(pl => String(pl.id))));
-            toast.info(`${data.length} listas de precios disponibles para selección múltiple`);
           }
         } else {
           setPriceListsError("No hay listas de precios disponibles");
@@ -216,10 +228,7 @@ export default function ExcelSender({ employeeData }) {
       const selectedIds = Array.from(selectedPriceLists);
       if (selectedIds.length === 0) return "";
       
-      // El primer ID seleccionado va después de /pricelist/
       const [primaryId, ...additionalIds] = selectedIds;
-      
-      // Los IDs adicionales van después de /subsidiary/
       const additionalPath = additionalIds.map(id => encodeURIComponent(id)).join('/');
       
       if (additionalPath) {
@@ -228,7 +237,6 @@ export default function ExcelSender({ employeeData }) {
         return `${base}/pricelist/${encodeURIComponent(primaryId)}/subsidiary/${encodeURIComponent(subsidiaryId)}`;
       }
     } else {
-      // Modo normal
       return `${base}/pricelist/${encodeURIComponent(priceListId)}/subsidiary/${encodeURIComponent(subsidiaryId)}`;
     }
   }, [baseUrl, companyId, priceListId, subsidiaryId, selectedPriceLists, cargaMode]);
@@ -237,12 +245,15 @@ export default function ExcelSender({ employeeData }) {
   const canSend = useMemo(() => {
     if (!fileProductos || !companyId || !subsidiaryId || loading) return false;
     
+    // Si NO vino del normalizer, necesita seleccionar almacén
+    if (!cameFromNormalizer && !selectedWarehouseId) return false;
+    
     if (cargaMode === "CONVERSION") {
       return selectedPriceLists.size > 0;
     } else {
       return !!priceListId;
     }
-  }, [fileProductos, companyId, subsidiaryId, loading, cargaMode, selectedPriceLists.size, priceListId]);
+  }, [fileProductos, companyId, subsidiaryId, loading, cargaMode, selectedPriceLists.size, priceListId, cameFromNormalizer, selectedWarehouseId]);
 
   const endpointPreview = canSend ? buildEndpoint() : "";
 
@@ -288,6 +299,17 @@ export default function ExcelSender({ employeeData }) {
     };
   }, []);
 
+  // ===== MANEJAR CAMBIO DE ALMACÉN (solo si NO viene del normalizer) =====
+  const handleWarehouseChange = (e) => {
+    const warehouseId = e.target.value;
+    setSelectedWarehouseId(warehouseId);
+    setIdWarehouse(warehouseId);
+
+    const warehouse = warehouses.find((w) => String(w.id) === String(warehouseId));
+    const warehouseName = (warehouse?.name || "").trim();
+    setSelectedWarehouseName(warehouseName);
+  };
+
   // ===== FUNCIÓN PARA DESCARGAR EXCEL DE ERRORES =====
   const downloadErrorExcel = useCallback(async (errorPath) => {
     try {
@@ -296,7 +318,6 @@ export default function ExcelSender({ employeeData }) {
         return;
       }
 
-      // Construir URL completa usando el nodo base
       const downloadUrl = `${baseUrl}/api/download/${errorPath.split('/download/')[1]}`;
       
       toast.info("Descargando Excel de errores...");
@@ -338,12 +359,18 @@ export default function ExcelSender({ employeeData }) {
     setLoading(true);
 
     try {
+      // Validaciones
       if (cargaMode === "CONVERSION" && selectedPriceLists.size === 0) {
         throw new Error("Debe seleccionar al menos una lista de precios");
       }
       
       if (cargaMode === "NORMAL" && !priceListId) {
         throw new Error("Debe seleccionar una lista de precios");
+      }
+
+      // Validar almacén si NO vino del normalizer
+      if (!cameFromNormalizer && !selectedWarehouseId) {
+        throw new Error("Debe seleccionar un almacén");
       }
 
       const data = await fileProductos.arrayBuffer();
@@ -362,9 +389,7 @@ export default function ExcelSender({ employeeData }) {
       
       setTotalBlocks(totalBlocks);
       
-      console.log(`📊 Total productos: ${totalRows}`);
-      console.log(`📦 Enviando en ${totalBlocks} bloques de ${BLOCK_SIZE}`);
-      console.log(`🔗 Endpoint: ${buildEndpoint()}`);
+      console.log(`💰 Código IGV a enviar: ${taxCodeCountry} (${taxCodeCountry === "01" ? "Aplica IGV" : "No aplica IGV"})`);
       
       toast.info(`Procesando ${totalRows} productos en ${totalBlocks} bloques de 400...`);
       
@@ -396,7 +421,10 @@ export default function ExcelSender({ employeeData }) {
         form.append("idCountry", idCountry);
         form.append("taxCodeCountry", taxCodeCountry);
         form.append("flagUseSimpleBrand", String(flagUseSimpleBrand));
-        if (idWarehouse) form.append("idWarehouse", idWarehouse);
+        
+        // Usar el warehouse que corresponda (ya sea del normalizer o seleccionado)
+        const warehouseToUse = selectedWarehouseId || idWarehouse;
+        if (warehouseToUse) form.append("idWarehouse", warehouseToUse);
         
         const endpoint = buildEndpoint();
         const token = new URLSearchParams(window.location.search).get("token");
@@ -428,7 +456,7 @@ export default function ExcelSender({ employeeData }) {
           data: blockResult,
           products: blockData.length,
           successful: blockSuccess,
-          errorExcelPath: blockResult?.data?.name_excel // Guardar ruta del Excel de errores si existe
+          errorExcelPath: blockResult?.data?.name_excel
         };
         
         allResults.push(blockInfo);
@@ -469,7 +497,148 @@ export default function ExcelSender({ employeeData }) {
     }
   };
 
-  // ===== COMPONENTE PRICE LIST SELECTOR SIMPLE =====
+  // ===== COMPONENTE SELECTOR DE IGV SIMPLE (SOLO si NO vino del normalizer) =====
+  const IgvSelector = () => {
+    // Si vino del normalizer, NO mostrar nada
+    if (cameFromNormalizer) {
+      return null;
+    }
+
+    return (
+      <div className="rounded-2xl border border-[#D9D9D9] bg-white p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-sm font-semibold text-[#02979B]">
+              Aplicar IGV
+            </span>
+            <p className="text-xs text-[#02979B]/60 mt-0.5">
+              {aplicarIgv ? "Se enviará código 01 (Con IGV)" : "Se enviará código 02 (Sin IGV)"}
+            </p>
+          </div>
+          
+          <button
+            type="button"
+            onClick={() => setAplicarIgv(!aplicarIgv)}
+            className={`relative w-14 h-7 rounded-full transition-colors ${
+              aplicarIgv ? 'bg-[#02979B]' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                aplicarIgv ? 'left-8' : 'left-1'
+              }`}
+            />
+          </button>
+        </div>
+        
+        <div className="mt-3 p-2 bg-[#02979B]/5 rounded-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[#02979B]/70">Código a enviar:</span>
+            <span className="text-sm font-mono font-bold text-[#02979B]">
+              {taxCodeCountry}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ===== COMPONENTE SELECTOR DE MODO (SOLO si NO vino del normalizer) =====
+  const ModeSelector = () => {
+    // Si vino del normalizer, NO mostrar nada
+    if (cameFromNormalizer) {
+      return null;
+    }
+
+    return (
+      <div className="flex items-center justify-between rounded-xl border border-[#D9D9D9] bg-white px-4 py-3">
+        <span className="text-sm font-semibold text-[#02979B]">
+          Modo de carga
+        </span>
+
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-medium ${cargaMode === "NORMAL" ? "text-[#02979B]" : "text-gray-400"}`}>
+            Normal
+          </span>
+
+          <button
+            type="button"
+            onClick={() =>
+              setCargaMode(cargaMode === "NORMAL" ? "CONVERSION" : "NORMAL")
+            }
+            className={`relative w-10 h-5 rounded-full transition ${
+              cargaMode === "NORMAL" ? "bg-[#02979B]" : "bg-gray-300"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                cargaMode === "CONVERSION" ? "translate-x-5" : ""
+              }`}
+            />
+          </button>
+
+          <span className={`text-xs font-medium ${cargaMode === "CONVERSION" ? "text-[#02979B]" : "text-gray-400"}`}>
+            Conversión
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  // ===== COMPONENTE SELECTOR DE ALMACÉN (SOLO si NO vino del normalizer) =====
+  const WarehouseSelector = () => {
+    // Si vino del normalizer, NO mostrar nada
+    if (cameFromNormalizer) {
+      return null;
+    }
+
+    return (
+      <div className="rounded-2xl border border-[#D9D9D9] bg-white p-4">
+        <div className="text-sm font-semibold text-[#02979B] mb-4">
+          Configuración de almacén
+        </div>
+        
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium text-[#02979B]">
+            Seleccionar Almacén <span className="text-red-500">*</span>
+          </label>
+          
+          {warehouses.length === 0 ? (
+            <div className="rounded-xl border border-[#D9D9D9] bg-gray-50 px-3 py-2 text-sm text-gray-500">
+              Cargando almacenes...
+            </div>
+          ) : warehouses.length === 1 ? (
+            <input
+              type="text"
+              value={warehouses[0].name}
+              readOnly
+              className="w-full rounded-xl border border-[#D9D9D9] bg-gray-100 px-3 py-2 text-sm text-[#02979B]"
+            />
+          ) : (
+            <select
+              value={selectedWarehouseId}
+              onChange={handleWarehouseChange}
+              required
+              className="w-full rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-sm text-[#02979B] outline-none focus:border-[#02979B] focus:ring-1 focus:ring-[#02979B]"
+            >
+              <option value="">Seleccione un almacén</option>
+              {warehouses.map((w) => (
+                <option key={w.id} value={String(w.id)}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {warehouses.length > 1 && !selectedWarehouseId && (
+            <p className="mt-1 text-xs text-red-500">Debe seleccionar un almacén para continuar</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ===== COMPONENTE PRICE LIST SELECTOR (siempre visible) =====
   const PriceListSelector = () => {
     if (loadingPriceLists) {
       return (
@@ -496,7 +665,6 @@ export default function ExcelSender({ employeeData }) {
       );
     }
 
-    // MODO CONVERSIÓN: Checkboxes simples
     if (cargaMode === "CONVERSION") {
       const selectedArray = Array.from(selectedPriceLists);
       
@@ -519,7 +687,7 @@ export default function ExcelSender({ employeeData }) {
           </div>
           
           <div className="space-y-2 max-h-60 overflow-y-auto border border-[#D9D9D9] rounded-xl p-3">
-            {priceLists.map((pl, index) => {
+            {priceLists.map((pl) => {
               const plId = String(pl.id);
               const isSelected = selectedPriceLists.has(plId);
               const isFirst = isSelected && selectedArray[0] === plId;
@@ -540,7 +708,7 @@ export default function ExcelSender({ employeeData }) {
                   <div className="flex-1">
                     <div className="text-sm font-medium text-[#02979B]">
                       {pl.name}
-                      {pl.flagDefault === 1 || pl.flagDefault === true && (
+                      {(pl.flagDefault === 1 || pl.flagDefault === true) && (
                         <span className="ml-2 text-xs bg-[#02979B]/20 text-[#02979B] px-2 py-0.5 rounded-full">
                           Por defecto
                         </span>
@@ -563,17 +731,11 @@ export default function ExcelSender({ employeeData }) {
           {selectedPriceLists.size === 0 && (
             <p className="text-xs text-red-500">Seleccione al menos una lista de precios</p>
           )}
-          
-          {selectedPriceLists.size > 0 && (
-            <div className="text-xs text-[#02979B]">
-              Orden de selección: {selectedArray.join(' → ')}
-            </div>
-          )}
         </div>
       );
     }
 
-    // MODO NORMAL: Select simple
+    // MODO NORMAL
     return (
       <div className="space-y-1.5">
         <label className="text-sm font-medium text-[#02979B]">
@@ -587,16 +749,10 @@ export default function ExcelSender({ employeeData }) {
           <option value="">Seleccione una lista de precios</option>
           {priceLists.map((pl) => (
             <option key={pl.id} value={String(pl.id)}>
-              {pl.name} {pl.flagDefault === 1 || pl.flagDefault === true ? '(Por defecto)' : ''}
+              {pl.name} {(pl.flagDefault === 1 || pl.flagDefault === true) ? '(Por defecto)' : ''}
             </option>
           ))}
         </select>
-        
-        {priceListId && (
-          <div className="mt-1 text-xs text-[#02979B]/60">
-            Seleccionado: {priceLists.find(pl => String(pl.id) === priceListId)?.name}
-          </div>
-        )}
       </div>
     );
   };
@@ -607,14 +763,25 @@ export default function ExcelSender({ employeeData }) {
     return result.blocks.some(block => block.errorExcelPath);
   }, [result]);
 
+  // Verificar si todos los productos se subieron correctamente
+  const allProductsSuccess = useMemo(() => {
+    if (!result) return false;
+    return result.successful_products === result.total_products;
+  }, [result]);
+
   return (
     <div className="w-full">
       <form className="space-y-6">
-        {/* Selector de Lista de Precios - Ahora como primera sección */}
+        {/* Estos componentes solo se renderizan si NO viene del normalizer */}
+        <ModeSelector />
+        <IgvSelector />
+        <WarehouseSelector />
+
+        {/* Selector de Lista de Precios - SIEMPRE visible */}
         <div className="rounded-2xl border border-[#D9D9D9] bg-white p-4">
           <div className="text-sm font-semibold text-[#02979B] mb-4">
             Configuración de envío
-            {cargaMode === "CONVERSION" && (
+            {cargaMode === "CONVERSION" && !cameFromNormalizer && (
               <span className="ml-2 text-xs bg-[#02979B] text-white px-2 py-1 rounded-full">
                 Modo Conversión
               </span>
@@ -752,77 +919,35 @@ export default function ExcelSender({ employeeData }) {
             </p>
           </div>
 
-          <div className="flex gap-2">
-            {/* Botón para descargar Excel de errores */}
-            {hasErrorExcel && (
-              <button
-                onClick={() => {
-                  const firstBlockWithError = result.blocks.find(block => block.errorExcelPath);
-                  if (firstBlockWithError) {
-                    downloadErrorExcel(firstBlockWithError.errorExcelPath);
-                  }
-                }}
-                className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 16v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4M12 12v8m-4-4l4 4 4-4M12 2v10" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Descargar Excel de errores
-              </button>
-            )}
-            
-            {result && (
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(JSON.stringify(result, null, 2));
-                  toast.success("Respuesta copiada");
-                }}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#02979B]/10 px-4 py-2 text-sm font-medium text-[#02979B] hover:bg-[#02979B]/20"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1M8 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M8 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Copiar respuesta
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-5">
-          {result ? (
-            <div className="rounded-2xl border border-[#D9D9D9] bg-white">
-              <pre className="max-h-[560px] overflow-auto rounded-2xl bg-[#02979B]/5 p-4 text-xs text-[#02979B]">
-                {JSON.stringify(result, null, 2)}
-              </pre>
-            </div>
-          ) : (
-            <EmptyState />
+          {/* Mostrar botón de descargar si hay errores, o mensaje de completado si todo salió bien */}
+          {result && (
+            <>
+              {hasErrorExcel ? (
+                <button
+                  onClick={() => {
+                    const firstBlockWithError = result.blocks.find(block => block.errorExcelPath);
+                    if (firstBlockWithError) {
+                      downloadErrorExcel(firstBlockWithError.errorExcelPath);
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 16v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4M12 12v8m-4-4l4 4 4-4M12 2v10" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Descargar Excel de errores
+                </button>
+              ) : allProductsSuccess && (
+                <div className="inline-flex items-center gap-2 rounded-xl bg-green-500 px-4 py-2 text-sm font-medium text-white">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 6L9 17L4 12" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Completado
+                </div>
+              )}
+            </>
           )}
         </div>
-
-        {/* Mostrar bloques con errores disponibles */}
-        {result && result.blocks && result.blocks.some(b => b.errorExcelPath) && (
-          <div className="mt-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
-            <h3 className="text-sm font-semibold text-orange-800 mb-2">📊 Bloques con errores:</h3>
-            <div className="space-y-2">
-              {result.blocks.map((block, idx) => (
-                block.errorExcelPath && (
-                  <div key={idx} className="flex items-center justify-between bg-white p-2 rounded-lg">
-                    <div className="text-xs text-orange-700">
-                      Bloque {block.block}: {block.products - block.successful} errores de {block.products} productos
-                    </div>
-                    <button
-                      onClick={() => downloadErrorExcel(block.errorExcelPath)}
-                      className="text-xs bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-600"
-                    >
-                      Descargar errores
-                    </button>
-                  </div>
-                )
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -835,22 +960,5 @@ function Spinner() {
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" d="M4 12a8 8 0 0 1 8-8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
     </svg>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#D9D9D9] bg-[#02979B]/5 p-8 text-center">
-      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-[#02979B] shadow-sm">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M7 3h8l4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" strokeLinejoin="round" />
-          <path d="M15 3v5h5" strokeLinejoin="round" />
-        </svg>
-      </div>
-      <div className="mt-3 text-sm font-semibold text-[#02979B]">Sin resultados todavía</div>
-      <div className="mt-1 text-sm text-[#02979B]/60">
-        Cuando envíes el Excel, aquí se mostrará la respuesta.
-      </div>
-    </div>
   );
 }
