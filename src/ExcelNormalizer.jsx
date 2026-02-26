@@ -524,9 +524,9 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
                 <p className="mt-1 text-xs text-red-500">Debe seleccionar un almacén para continuar</p>
               )}
 
-              <p className="mt-1 text-xs text-[#02979B]/60">
+              {/* <p className="mt-1 text-xs text-[#02979B]/60">
                 Este almacén aparecerá en la columna W-{"{NOMBRE_ALMACEN}"} del Excel final
-              </p>
+              </p> */}
             </div>
           </div>
         </div>

@@ -497,93 +497,84 @@ export default function ExcelSender({ employeeData, warehouses = [] }) {
     }
   };
 
-  // ===== COMPONENTE SELECTOR DE IGV SIMPLE (SOLO si NO vino del normalizer) =====
-  const IgvSelector = () => {
-    // Si vino del normalizer, NO mostrar nada
-    if (cameFromNormalizer) {
-      return null;
-    }
+ 
+// ===== COMPONENTE SELECTOR DE IGV SIMPLE (SOLO si NO vino del normalizer) =====
+const IgvSelector = () => {
+  // Si vino del normalizer, NO mostrar nada
+  if (cameFromNormalizer) {
+    return null;
+  }
 
-    return (
-      <div className="rounded-2xl border border-[#D9D9D9] bg-white p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-sm font-semibold text-[#02979B]">
-              Aplicar IGV
-            </span>
-            <p className="text-xs text-[#02979B]/60 mt-0.5">
-              {aplicarIgv ? "Se enviará código 01 (Con IGV)" : "Se enviará código 02 (Sin IGV)"}
-            </p>
-          </div>
-          
-          <button
-            type="button"
-            onClick={() => setAplicarIgv(!aplicarIgv)}
-            className={`relative w-14 h-7 rounded-full transition-colors ${
-              aplicarIgv ? 'bg-[#02979B]' : 'bg-gray-300'
+  return (
+    <div className="flex-1 rounded-2xl border border-[#D9D9D9] bg-white p-4">
+      <div className="flex items-center justify-between">
+        <div>
+        <span className="text-sm font-semibold text-[#02979B]">
+          Aplicar IGV
+        </span>
+        <p className="text-xs text-[#02979B]/60 mt-0.5">
+          {aplicarIgv ? "Con IGV (18%)" : "Sin IGV"}
+        </p>
+      </div>
+        
+        <button
+          type="button"
+          onClick={() => setAplicarIgv(!aplicarIgv)}
+          className={`relative w-14 h-7 rounded-full transition-colors flex-shrink-0 ${
+            aplicarIgv ? 'bg-[#02979B]' : 'bg-[#E5E7EB]'
+          }`}
+        >
+          <span
+            className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+              aplicarIgv ? 'left-8' : 'left-1'
             }`}
-          >
-            <span
-              className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                aplicarIgv ? 'left-8' : 'left-1'
-              }`}
-            />
-          </button>
+          />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ===== COMPONENTE SELECTOR DE MODO (SOLO si NO vino del normalizer) =====
+const ModeSelector = () => {
+  // Si vino del normalizer, NO mostrar nada
+  if (cameFromNormalizer) {
+    return null;
+  }
+
+  return (
+    <div className="flex-1 rounded-2xl border border-[#D9D9D9] bg-white p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-sm font-semibold text-[#02979B]">
+            Modo de carga
+          </span>
+          <p className="text-xs text-[#02979B]/60 mt-0.5">
+            {cargaMode === "NORMAL" ? "Modo Normal" : "Modo Conversión"}
+          </p>
         </div>
         
-        <div className="mt-3 p-2 bg-[#02979B]/5 rounded-lg">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-[#02979B]/70">Código a enviar:</span>
-            <span className="text-sm font-mono font-bold text-[#02979B]">
-              {taxCodeCountry}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ===== COMPONENTE SELECTOR DE MODO (SOLO si NO vino del normalizer) =====
-  const ModeSelector = () => {
-    // Si vino del normalizer, NO mostrar nada
-    if (cameFromNormalizer) {
-      return null;
-    }
-
-    return (
-      <div className="flex items-center justify-between rounded-xl border border-[#D9D9D9] bg-white px-4 py-3">
-        <span className="text-sm font-semibold text-[#02979B]">
-          Modo de carga
-        </span>
-
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium ${cargaMode === "NORMAL" ? "text-[#02979B]" : "text-gray-400"}`}>
-            Normal
-          </span>
-
-          <button
-            type="button"
-            onClick={() =>
-              setCargaMode(cargaMode === "NORMAL" ? "CONVERSION" : "NORMAL")
-            }
-            className={`relative w-10 h-5 rounded-full transition ${
-              cargaMode === "NORMAL" ? "bg-[#02979B]" : "bg-gray-300"
+        <button
+          type="button"
+          onClick={() =>
+            setCargaMode(cargaMode === "NORMAL" ? "CONVERSION" : "NORMAL")
+          }
+          className={`relative w-14 h-7 rounded-full transition-colors flex-shrink-0 ${
+            cargaMode === "NORMAL" ? "bg-[#02979B]" : "bg-[#E5E7EB]"
+          }`}
+        >
+          <span
+            className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+              cargaMode === "CONVERSION" ? "left-8" : "left-1"
             }`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                cargaMode === "CONVERSION" ? "translate-x-5" : ""
-              }`}
-            />
-          </button>
-
-          <span className={`text-xs font-medium ${cargaMode === "CONVERSION" ? "text-[#02979B]" : "text-gray-400"}`}>
-            Conversión
-          </span>
-        </div>
+          />
+        </button>
       </div>
-    );
-  };
+    </div>
+  );
+};
+
+
 
   // ===== COMPONENTE SELECTOR DE ALMACÉN (SOLO si NO vino del normalizer) =====
   const WarehouseSelector = () => {
@@ -773,9 +764,18 @@ export default function ExcelSender({ employeeData, warehouses = [] }) {
     <div className="w-full">
       <form className="space-y-6">
         {/* Estos componentes solo se renderizan si NO viene del normalizer */}
-        <ModeSelector />
+        {/* <ModeSelector />
         <IgvSelector />
-        <WarehouseSelector />
+        <WarehouseSelector /> */}
+         {!cameFromNormalizer && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ModeSelector />
+              <IgvSelector />
+            </div>
+          )}
+
+          <WarehouseSelector />
+
 
         {/* Selector de Lista de Precios - SIEMPRE visible */}
         <div className="rounded-2xl border border-[#D9D9D9] bg-white p-4">
