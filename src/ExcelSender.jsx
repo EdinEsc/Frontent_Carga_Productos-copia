@@ -126,6 +126,48 @@ export default function ExcelSender({ employeeData, warehouses = [] }) {
   const [errorDetails, setErrorDetails] = useState(null);
   const [result, setResult] = useState(null);
 
+  // ===== MOSTRAR EN CONSOLA LOS IDs CADA VEZ QUE CAMBIAN =====
+  useEffect(() => {
+    if (companyId || subsidiaryId || selectedWarehouseId || idWarehouse || priceListId || selectedPriceLists.size > 0) {
+      console.log('%c📋 VERIFICACIÓN DE IDs', 'font-size: 14px; font-weight: bold; color: #02979B;');
+      console.log('%c🔵 ID Compañía:', 'font-weight: bold; color: #0066cc;', companyId || 'No definido');
+      console.log('%c🟢 ID Tienda (subsidiary):', 'font-weight: bold; color: #00cc66;', subsidiaryId || 'No definido');
+      console.log('%c🟡 ID Almacén:', 'font-weight: bold; color: #cc9900;', selectedWarehouseId || idWarehouse || 'No definido');
+      
+      // Mostrar lista(s) de precios
+      if (cargaMode === "CONVERSION") {
+        const selectedArray = Array.from(selectedPriceLists);
+        if (selectedArray.length > 0) {
+          console.log('%c📊 Listas de Precios (Modo Conversión):', 'font-weight: bold; color: #9933cc;');
+          selectedArray.forEach((id, index) => {
+            const priceList = priceLists.find(pl => String(pl.id) === String(id));
+            const role = index === 0 ? '🔹 Principal' : '🔸 Secundaria';
+            console.log(`  ${role} - ID: ${id} ${priceList ? `(${priceList.name})` : ''}`);
+          });
+        } else {
+          console.log('%c📊 Listas de Precios:', 'font-weight: bold; color: #9933cc;', 'No definido');
+        }
+      } else {
+        if (priceListId) {
+          const priceList = priceLists.find(pl => String(pl.id) === String(priceListId));
+          console.log('%c📊 Lista de Precios (Modo Normal):', 'font-weight: bold; color: #9933cc;', 
+            `ID: ${priceListId} ${priceList ? `(${priceList.name})` : ''}`);
+        } else {
+          console.log('%c📊 Lista de Precios:', 'font-weight: bold; color: #9933cc;', 'No definido');
+        }
+      }
+      
+      console.log('%c📎 Origen:', 'font-weight: bold; color: #666666;', cameFromNormalizer ? 'Vino del Normalizer' : 'Selección manual');
+      if (cameFromNormalizer) {
+        const warehouseName = warehouses.find(w => String(w.id) === String(selectedWarehouseId))?.name;
+        if (warehouseName) {
+          console.log('%c🏢 Almacén:', 'font-weight: bold; color: #666666;', warehouseName);
+        }
+      }
+      console.log('%c------------------------', 'color: #02979B;');
+    }
+  }, [companyId, subsidiaryId, selectedWarehouseId, idWarehouse, cameFromNormalizer, warehouses, priceListId, selectedPriceLists, cargaMode, priceLists]);
+
   // ===== CARGAR DATOS DEL EMPLEADO =====
   useEffect(() => {
     if (employeeData) {
@@ -357,6 +399,36 @@ export default function ExcelSender({ employeeData, warehouses = [] }) {
     setBlockResults([]);
     setProgress(0);
     setLoading(true);
+
+    // ===== MOSTRAR VERIFICACIÓN FINAL ANTES DE ENVIAR =====
+    console.log('%c🚀 INICIANDO ENVÍO - VERIFICACIÓN FINAL', 'font-size: 16px; font-weight: bold; color: #ff6600;');
+    console.log('%c🔵 Compañía ID:', 'font-weight: bold; color: #0066cc;', companyId);
+    console.log('%c🟢 Tienda ID (subsidiary):', 'font-weight: bold; color: #00cc66;', subsidiaryId);
+    console.log('%c🟡 Almacén ID:', 'font-weight: bold; color: #cc9900;', selectedWarehouseId || idWarehouse);
+    
+    // Mostrar lista(s) de precios en verificación final
+    if (cargaMode === "CONVERSION") {
+      const selectedArray = Array.from(selectedPriceLists);
+      console.log('%c📊 Listas de Precios (Modo Conversión):', 'font-weight: bold; color: #9933cc;');
+      selectedArray.forEach((id, index) => {
+        const priceList = priceLists.find(pl => String(pl.id) === String(id));
+        const role = index === 0 ? '🔹 Principal (va en /pricelist/)' : '🔸 Secundaria';
+        console.log(`  ${role} - ID: ${id} ${priceList ? `(${priceList.name})` : ''}`);
+      });
+    } else {
+      const priceList = priceLists.find(pl => String(pl.id) === String(priceListId));
+      console.log('%c📊 Lista de Precios (Modo Normal):', 'font-weight: bold; color: #9933cc;', 
+        `ID: ${priceListId} ${priceList ? `(${priceList.name})` : ''}`);
+    }
+    
+    if (selectedWarehouseName) {
+      console.log('%c🏢 Almacén:', 'font-weight: bold; color: #666666;', selectedWarehouseName);
+    }
+    console.log('%c📦 Modo:', 'font-weight: bold; color: #666666;', cargaMode);
+    console.log('%c💰 IGV:', 'font-weight: bold; color: #666666;', taxCodeCountry === "01" ? "Aplica IGV (18%)" : "Sin IGV");
+    console.log('%c📎 Origen:', 'font-weight: bold; color: #666666;', cameFromNormalizer ? 'Vino del Normalizer' : 'Selección manual');
+    console.log('%c📁 Archivo:', 'font-weight: bold; color: #666666;', fileProductos?.name || 'No seleccionado');
+    console.log('%c------------------------', 'color: #ff6600;');
 
     try {
       // Validaciones
@@ -764,9 +836,6 @@ const ModeSelector = () => {
     <div className="w-full">
       <form className="space-y-6">
         {/* Estos componentes solo se renderizan si NO viene del normalizer */}
-        {/* <ModeSelector />
-        <IgvSelector />
-        <WarehouseSelector /> */}
          {!cameFromNormalizer && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ModeSelector />
