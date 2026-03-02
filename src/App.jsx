@@ -9,7 +9,7 @@ import ExcelSender from "./components/ExcelSender";
 
 export default function App() {
   const [active, setActive] = useState("normalizacion");
-  const [isLoading, setIsLoading] = useState(false); // Estado de carga desde ExcelSender
+  const [isLoading, setIsLoading] = useState(false); 
   const { employeeData, warehouses } = useAuth();
 
   const handleNavigateToCarga = () => {
