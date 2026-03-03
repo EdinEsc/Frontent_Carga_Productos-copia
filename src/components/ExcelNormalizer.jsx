@@ -8,6 +8,7 @@ import Spinner from "./shared/Spinner";
 import ToggleCard from "./shared/ToggleCard";
 import ModeButton from "./shared/ModeButton";
 import FileUploader from "./shared/FileUploader";
+import DeleteConfirmDialog from "./shared/DeleteConfirmDialog";
 
 export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) {
   // Estado principal
@@ -24,6 +25,15 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
   const [openGroups, setOpenGroups] = useState(() => new Set());
   const [openCodeGroups, setOpenCodeGroups] = useState(() => new Set());
   const [selectAllEnabled, setSelectAllEnabled] = useState(false);
+  
+  // Estado para diálogo de confirmación
+  const [deleteDialog, setDeleteDialog] = useState({
+    isOpen: false,
+    groupId: null,
+    rowId: null,
+    isCodeGroup: false,
+    rowData: null
+  });
 
   // IGV settings
   const [applyIgvCost, setApplyIgvCost] = useState(true);
@@ -72,6 +82,68 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
     setSelected(new Set());
     setOpenGroups(new Set());
     setOpenCodeGroups(new Set());
+  };
+
+  // ===== FUNCIÓN: Abrir diálogo de eliminación =====
+  const openDeleteDialog = (groupId, rowId, isCodeGroup = false, rowData = null) => {
+    setDeleteDialog({
+      isOpen: true,
+      groupId,
+      rowId,
+      isCodeGroup,
+      rowData
+    });
+  };
+
+  // ===== FUNCIÓN: Confirmar eliminación =====
+  const confirmDelete = () => {
+    const { groupId, rowId, isCodeGroup } = deleteDialog;
+
+    if (isCodeGroup) {
+      setCodeGroups(prevGroups => {
+        const newGroups = prevGroups.map(group => {
+          if (group.codigo === groupId) {
+            const newRows = group.rows.filter(row => row.fila !== rowId);
+            if (newRows.length === 0) return null;
+            return { ...group, rows: newRows, count: newRows.length };
+          }
+          return group;
+        }).filter(group => group !== null);
+        return newGroups;
+      });
+    } else {
+      setGroups(prevGroups => {
+        const newGroups = prevGroups.map(group => {
+          if (group.key === groupId) {
+            const newRows = group.rows.filter(row => row.__ROW_ID__ !== rowId);
+            if (newRows.length === 0) return null;
+            return { ...group, rows: newRows, count: newRows.length };
+          }
+          return group;
+        }).filter(group => group !== null);
+        return newGroups;
+      });
+    }
+
+    setSelected(prev => {
+      const newSelected = new Set(prev);
+      newSelected.delete(rowId);
+      return newSelected;
+    });
+
+    toast.success('Fila eliminada correctamente');
+    closeDeleteDialog();
+  };
+
+  // ===== FUNCIÓN: Cerrar diálogo de eliminación =====
+  const closeDeleteDialog = () => {
+    setDeleteDialog({
+      isOpen: false,
+      groupId: null,
+      rowId: null,
+      isCodeGroup: false,
+      rowData: null
+    });
   };
 
   // Toggle functions
@@ -165,7 +237,6 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
       sessionStorage.setItem('selectedWarehouseId', selectedWarehouseId);
     }
     
-    // Verificar que se guardó correctamente
     console.log('✅ [Normalizer] Verificación en sessionStorage:', {
       applyIgvCost: sessionStorage.getItem('applyIgvCost'),
       applyIgvSale: sessionStorage.getItem('applyIgvSale'),
@@ -173,9 +244,8 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
     });
   };
 
-  // ===== HANDLEDOWNLOAD MODIFICADO - acepta uploadIdParam =====
+  // ===== HANDLEDOWNLOAD =====
   const handleDownload = async (selectedIds, uploadIdParam = null) => {
-    // Usar el parámetro si se pasa, sino usar el state
     const effectiveUploadId = uploadIdParam || uploadId;
     
     console.log('📥 [Normalizer] DESCARGANDO ARCHIVO CON:', {
@@ -189,7 +259,6 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
       timestamp: new Date().toISOString()
     });
     
-    // ✅ VALIDAR uploadId para modo NORMAL
     if (mode === "NORMAL" && !effectiveUploadId) {
       setError("Error: No se pudo obtener el ID de carga");
       return;
@@ -219,7 +288,7 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
     }
   };
 
-  // ===== ONANALYZE MODIFICADO - usa data.upload_id directamente =====
+  // ===== ONANALYZE =====
   const onAnalyze = async (e) => {
     e.preventDefault();
     
@@ -248,7 +317,6 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
       
       const data = await analyzeFile(file, mode, { selectedWarehouseId, selectedWarehouseName }, igvSettings);
       
-      // Guardar en state para futuros renders (cuando hay duplicados)
       if (mode === "NORMAL" && data.upload_id) {
         setUploadId(data.upload_id);
         console.log('✅ upload_id guardado en state:', data.upload_id);
@@ -263,16 +331,13 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
       if (nextGroups.length > 0) setOpenGroups(new Set([nextGroups[0].key]));
       if (nextCodeGroups.length > 0) setOpenCodeGroups(new Set([nextCodeGroups[0].codigo]));
       
-      // 🟢 CORREGIDO: Usar data.upload_id DIRECTAMENTE, no el state
       if (!data.has_duplicates && !data.has_code_duplicates) {
         console.log('🚀 [Normalizer] No hay duplicados, descargando directamente...');
         
-        // Verificar que tenemos uploadId para modo NORMAL
         if (mode === "NORMAL" && !data.upload_id) {
           throw new Error("El backend no proporcionó un upload_id");
         }
         
-        // Pasar el upload_id de la respuesta
         await handleDownload([], data.upload_id);
       }
       
@@ -283,7 +348,7 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
     }
   };
 
-  // ===== ONCONTINUEWITH SELECTION (sin cambios, usa el state) =====
+  // ===== ONCONTINUEWITH SELECTION =====
   const onContinueWithSelection = async () => {
     console.log('🎯 [Normalizer] CONTINUANDO CON SELECCIÓN - Estado actual:', {
       applyIgvCost,
@@ -315,12 +380,10 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
       return;
     }
 
-    // Guardar estado antes de continuar
     saveState();
 
     try {
       setLoading(true);
-      // Aquí usamos el state uploadId porque ya se actualizó
       await handleDownload(Array.from(selected));
     } catch (err) {
       setError(err?.message || "Error");
@@ -551,6 +614,7 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
           openGroups={openGroups}
           onToggleGroup={toggleGroupOpen}
           onToggleRow={toggleRow}
+          onDeleteRow={(groupId, rowId, rowData) => openDeleteDialog(groupId, rowId, false, rowData)}
           idField="__ROW_ID__"
         />
       )}
@@ -568,6 +632,7 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
           openGroups={openCodeGroups}
           onToggleGroup={(key) => toggleCodeGroupOpen(key)}
           onToggleRow={toggleRow}
+          onDeleteRow={(groupId, rowId, rowData) => openDeleteDialog(groupId, rowId, true, rowData)}
           idField="__ROW_ID__"
         />
       )}
@@ -596,12 +661,29 @@ export default function ExcelNormalizer({ onNavigateToCarga, warehouses = [] }) 
           </button>
         </div>
       )}
+
+      {/* Diálogo de confirmación para eliminar */}
+      <DeleteConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={confirmDelete}
+        rowData={deleteDialog.rowData}
+      />
     </div>
   );
 }
 
-// Componente para mostrar grupos duplicados (sin cambios)
-function DuplicateGroup({ title, groups, selected, openGroups, onToggleGroup, onToggleRow, idField }) {
+// Componente para mostrar grupos duplicados (SIN EDICIÓN)
+function DuplicateGroup({ 
+  title, 
+  groups, 
+  selected, 
+  openGroups, 
+  onToggleGroup, 
+  onToggleRow, 
+  onDeleteRow,
+  idField 
+}) {
   return (
     <div className="mt-6">
       <div className="flex items-start justify-between gap-4">
@@ -609,6 +691,7 @@ function DuplicateGroup({ title, groups, selected, openGroups, onToggleGroup, on
           <h2 className="text-lg font-semibold text-[#02979B]">{title}</h2>
           <p className="mt-1 text-sm text-[#02979B]/60">
             Seleccione al menos una fila por cada grupo duplicado para continuar.
+            Puede eliminar filas con el botón 🗑️.
           </p>
         </div>
       </div>
@@ -625,7 +708,11 @@ function DuplicateGroup({ title, groups, selected, openGroups, onToggleGroup, on
               <div key={g.key} className={`overflow-hidden rounded-2xl border ${
                 !hasSelection ? 'border-red-300 bg-red-50/30' : 'border-[#D9D9D9]'
               }`}>
-                <button type="button" onClick={() => onToggleGroup(g.key)} className="w-full text-left">
+                <button 
+                  type="button" 
+                  onClick={() => onToggleGroup(g.key)} 
+                  className="w-full text-left"
+                >
                   <div className={`flex items-start justify-between gap-4 px-5 py-4 ${
                     !hasSelection ? 'bg-red-50' : 'bg-[#02979B]/5'
                   }`}>
@@ -658,6 +745,7 @@ function DuplicateGroup({ title, groups, selected, openGroups, onToggleGroup, on
                           {columns.map((c) => (
                             <th key={c} className="px-4 py-3 text-left text-xs font-semibold text-[#02979B]">{c}</th>
                           ))}
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-[#02979B]">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -679,6 +767,18 @@ function DuplicateGroup({ title, groups, selected, openGroups, onToggleGroup, on
                                 {String(r[c] ?? "")}
                               </td>
                             ))}
+                            <td className="px-4 py-3">
+                              <button
+                                type="button"
+                                onClick={() => onDeleteRow(g.key, r[idField], r)}
+                                className="text-red-500 hover:text-red-700 transition-colors"
+                                title="Eliminar esta fila"
+                              >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round"/>
+                                </svg>
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>

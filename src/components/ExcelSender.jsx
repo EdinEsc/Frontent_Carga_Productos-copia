@@ -674,20 +674,6 @@ export default function ExcelSender({ employeeData, warehouses = [], onLoadingCh
                   : "bg-[#D9D9D9] cursor-not-allowed"
               }`}
             >
-            {/* <button
-              type="button"
-              onClick={handleSend}
-              disabled={!canSend}
-              className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white transition md:w-auto ${
-                canSend ? "bg-[#02979B] hover:bg-[#02979B]/80" : "bg-[#D9D9D9] cursor-not-allowed"
-              }`}
-            > */}
-              {/* {loading ? (
-                <>
-                  <Spinner />
-                  {progress > 0 ? `Enviando... ${progress}%` : "Enviando..."}
-                </>
-              ) : ( */}
               {loading ? (
                 <>
                   <Spinner />
