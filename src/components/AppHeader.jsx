@@ -112,19 +112,6 @@ export default function AppHeader({
 
         </div>
       </div>
-
-      {/* Barra de progreso */}
-      {isLoading && (
-        <div className="relative">
-          <div className="h-0.5 w-full bg-gray-200">
-            <div
-              className="h-0.5 bg-gradient-to-r from-orange-400 to-orange-600 animate-pulse"
-              style={{ width: "100%" }}
-            />
-          </div>
-        </div>
-      )}
-
       <div className="h-0.5 w-full bg-gradient-to-r from-[#02979B] to-[#01A9AD]"></div>
 
     </header>

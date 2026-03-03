@@ -600,11 +600,17 @@ export default function ExcelSender({ employeeData, warehouses = [], onLoadingCh
                 Bloque {currentBlock} de {totalBlocks}
               </span>
             </div>
-            <div className="w-full bg-orange-200 rounded-full h-2.5">
+            <div className="w-full bg-orange-200 rounded-full h-3 overflow-hidden shadow-inner">
               <div 
-                className="bg-orange-500 h-2.5 rounded-full transition-all duration-300"
+                className="h-3 rounded-full bg-orange-500 relative transition-all duration-500 ease-out shadow-md"
                 style={{ width: `${progress}%` }}
-              />
+              >
+                {/* Brillo fuerte en movimiento */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/70 to-transparent animate-pulse" />
+
+                {/* Efecto de energía al final */}
+                <div className="absolute right-0 top-0 h-full w-3 bg-white/60 blur-sm animate-bounce" />
+              </div>
             </div>
             
             {/* 🚨 ADVERTENCIA DE RECARGA */}
@@ -659,15 +665,33 @@ export default function ExcelSender({ employeeData, warehouses = [], onLoadingCh
             <button
               type="button"
               onClick={handleSend}
+              disabled={!canSend || loading}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white transition md:w-auto ${
+                loading
+                  ? "bg-orange-500 animate-pulse cursor-not-allowed"
+                  : canSend
+                  ? "bg-[#02979B] hover:bg-[#02979B]/80"
+                  : "bg-[#D9D9D9] cursor-not-allowed"
+              }`}
+            >
+            {/* <button
+              type="button"
+              onClick={handleSend}
               disabled={!canSend}
               className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white transition md:w-auto ${
                 canSend ? "bg-[#02979B] hover:bg-[#02979B]/80" : "bg-[#D9D9D9] cursor-not-allowed"
               }`}
-            >
-              {loading ? (
+            > */}
+              {/* {loading ? (
                 <>
                   <Spinner />
                   {progress > 0 ? `Enviando... ${progress}%` : "Enviando..."}
+                </>
+              ) : ( */}
+              {loading ? (
+                <>
+                  <Spinner />
+                  Procesando bloques...
                 </>
               ) : (
                 <>
