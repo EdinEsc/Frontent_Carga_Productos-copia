@@ -1,9 +1,3 @@
-
-
-
-
-
-// Configuración de APIs
 export const API_CONFIG = {
 
 

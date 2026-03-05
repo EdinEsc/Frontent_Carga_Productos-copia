@@ -35,7 +35,6 @@ export default function AppHeader({
 
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
 
-        {/* IZQUIERDA: SOLO LOGO PNG */}
         <div className="relative flex items-center">
           <img
             src={LogoCasaMarket}
@@ -43,7 +42,7 @@ export default function AppHeader({
             className="h-14 w-auto object-contain"
           />
 
-          {/* Indicador de carga sobre el logo */}
+   
           {isLoading && (
             <div className="absolute -top-1 -right-1">
               <span className="relative flex h-3 w-3">
@@ -54,10 +53,9 @@ export default function AppHeader({
           )}
         </div>
 
-        {/* DERECHA: Botones */}
         <div className="flex items-center gap-3">
 
-          {/* BOTÓN LIMPIEZA */}
+ 
           <button
             onClick={() => handleTabChange("normalizacion")}
             className={`${baseBtn} ${
@@ -89,7 +87,7 @@ export default function AppHeader({
             )}
           </button>
 
-          {/* BOTÓN CARGA */}
+ 
           <button
             onClick={() => handleTabChange("carga")}
             className={`${baseBtn} relative ${
